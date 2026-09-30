@@ -1,5 +1,40 @@
 plugins { id 'com.android.application' }
 
-android { namespace 'com.wallathemes.fluffystuffys'; compileSdk 35
- defaultConfig { applicationId 'com.wallathemes.fluffystuffys'; minSdk 18; targetSdk 35; versionCode 10000; versionName '1.0.0' }
+android {
+    namespace 'com.wallathemes.fluffystuffys'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.wallathemes.fluffystuffys'
+        minSdk 18
+        targetSdk 35
+        versionCode 10000
+        versionName '1.0.0'
+    }
+
+    // CI supplies the keystore path and credentials through environment variables.
+    // Local builds remain possible without a release keystore.
+    def ciKeystorePath = System.getenv('WALLA_KEYSTORE_PATH')
+    def ciKeystorePassword = System.getenv('WALLA_KEYSTORE_PASSWORD')
+    def ciKeyAlias = System.getenv('WALLA_KEY_ALIAS')
+    def ciKeyPassword = System.getenv('WALLA_KEY_PASSWORD')
+
+    signingConfigs {
+        release {
+            if (ciKeystorePath && file(ciKeystorePath).exists()) {
+                storeFile file(ciKeystorePath)
+                storePassword ciKeystorePassword
+                keyAlias ciKeyAlias
+                keyPassword ciKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (ciKeystorePath && file(ciKeystorePath).exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
 }
