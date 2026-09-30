@@ -65,6 +65,24 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Create CI release keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/walla-release.jks"
+          PASSWORD="$(python3 - <<'PY'
+          import secrets
+          print(secrets.token_urlsafe(32))
+          PY
+          )"
+          keytool -genkeypair -v             -keystore "$KEYSTORE"             -storepass "$PASSWORD"             -keypass "$PASSWORD"             -alias walla-release             -keyalg RSA             -keysize 2048             -validity 10000             -dname "CN=Walla's Fluffy Stuffy's, OU=Release, O=Walla's Fluffy Stuffy's, L=Unknown, ST=Unknown, C=ZA"
+          {
+            echo "WALLA_KEYSTORE_PATH=$KEYSTORE"
+            echo "WALLA_KEYSTORE_PASSWORD=$PASSWORD"
+            echo "WALLA_KEY_ALIAS=walla-release"
+            echo "WALLA_KEY_PASSWORD=$PASSWORD"
+          } >> "$GITHUB_ENV"
+
       - name: Validate Android resource XML
         shell: bash
         run: |
@@ -77,12 +95,21 @@ jobs:
           print('Android values XML is well-formed.')
           PY
 
-      - name: Build release APK
+      - name: Build signed release APK
         run: gradle --no-daemon :app:clean :app:assembleRelease
 
-      - name: Upload APK
+      - name: Verify APK signature and alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          apksigner verify --verbose --print-certs "$APK"
+          zipalign -c -P 16 -v 4 "$APK"
+
+      - name: Upload install-ready APK
         uses: actions/upload-artifact@v4
         with:
-          name: Wallas-Fluffy-Stuffys-APK
-          path: app/build/outputs/apk/release/*.apk
+          name: Wallas-Fluffy-Stuffys-install-ready
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
