@@ -1,4 +1,5 @@
 name: Build WALLA APK
+# Release verification uses explicit Android SDK build-tools paths.
 
 on:
   workflow_dispatch:
