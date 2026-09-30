@@ -1,33 +1,75 @@
-name: Build APK
+name: Build WALLA APK
+
 on:
   workflow_dispatch:
   push:
-    paths:
-      - '**'
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Locate project
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Android project
+        shell: bash
         run: |
-          if [ -f Wallas-Fluffy-Stuffys-Android-project.zip ]; then unzip -q Wallas-Fluffy-Stuffys-Android-project.zip -d _project; fi
-          if [ -d _project/app ]; then cp -r _project/. .; fi
-      - uses: actions/setup-java@v4
+          set -euo pipefail
+
+          # The project may be stored directly in the repository or as a ZIP.
+          if [ -f "Wallas-Fluffy-Stuffys-Android-project.zip" ]; then
+            rm -rf _project
+            mkdir -p _project
+            unzip -q "Wallas-Fluffy-Stuffys-Android-project.zip" -d _project
+
+            # Handle a single top-level folder inside the archive.
+            if [ -d "_project/app" ]; then
+              cp -a _project/. .
+            else
+              project_dir="$(find _project -mindepth 1 -maxdepth 2 -type d -name app -print -quit | sed 's#/app$##')"
+              if [ -n "$project_dir" ]; then
+                cp -a "$project_dir"/. .
+              fi
+            fi
+          fi
+
+          echo "Project tree:"
+          find app -maxdepth 4 -type f 2>/dev/null | sort | head -200 || true
+
+          if [ ! -f "settings.gradle" ] && [ ! -f "settings.gradle.kts" ]; then
+            echo "::error::No Gradle settings file found."
+            exit 1
+          fi
+
+          if [ ! -f "app/src/main/AndroidManifest.xml" ]; then
+            echo "::error::app/src/main/AndroidManifest.xml is missing."
+            echo "::error::The WALLA Android source/assets must be present in the repository or in Wallas-Fluffy-Stuffys-Android-project.zip before an APK can be built."
+            exit 1
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-      - name: Install Gradle
+
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+
       - name: Build release APK
-        run: gradle :app:assembleRelease
+        run: gradle --no-daemon :app:assembleRelease
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Wallas-Fluffy-Stuffys-APK
           path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
