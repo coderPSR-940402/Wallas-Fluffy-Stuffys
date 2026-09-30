@@ -65,8 +65,20 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Validate Android resource XML
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RIn '\\u[0-9A-Fa-f]*[^0-9A-Fa-f]' app/src/main/res/values && { echo '::error::Invalid Unicode escape found in Android values resources.'; exit 1; } || true
+          python3 - <<'PY'
+          import pathlib, xml.etree.ElementTree as ET
+          for p in pathlib.Path('app/src/main/res/values').glob('*.xml'):
+              ET.parse(p)
+          print('Android values XML is well-formed.')
+          PY
+
       - name: Build release APK
-        run: gradle --no-daemon :app:assembleRelease
+        run: gradle --no-daemon :app:clean :app:assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
