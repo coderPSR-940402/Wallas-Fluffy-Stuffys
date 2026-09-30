@@ -1,0 +1,5 @@
+plugins { id 'com.android.application' }
+
+android { namespace 'com.wallathemes.fluffystuffys'; compileSdk 35
+ defaultConfig { applicationId 'com.wallathemes.fluffystuffys'; minSdk 18; targetSdk 35; versionCode 10000; versionName '1.0.0' }
+}
