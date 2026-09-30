@@ -12,41 +12,42 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Prepare Android project
+      - name: Restore WALLA icon assets
         shell: bash
         run: |
           set -euo pipefail
 
-          # The project may be stored directly in the repository or as a ZIP.
-          if [ -f "Wallas-Fluffy-Stuffys-Android-project.zip" ]; then
-            rm -rf _project
-            mkdir -p _project
-            unzip -q "Wallas-Fluffy-Stuffys-Android-project.zip" -d _project
-
-            # Handle a single top-level folder inside the archive.
-            if [ -d "_project/app" ]; then
-              cp -a _project/. .
-            else
-              project_dir="$(find _project -mindepth 1 -maxdepth 2 -type d -name app -print -quit | sed 's#/app$##')"
-              if [ -n "$project_dir" ]; then
-                cp -a "$project_dir"/. .
-              fi
-            fi
-          fi
-
-          echo "Project tree:"
-          find app -maxdepth 4 -type f 2>/dev/null | sort | head -200 || true
-
-          if [ ! -f "settings.gradle" ] && [ ! -f "settings.gradle.kts" ]; then
-            echo "::error::No Gradle settings file found."
+          if [ ! -f Wallas-assets.part01 ] || [ ! -f Wallas-assets.part02 ] || [ ! -f Wallas-assets.part03 ] || [ ! -f Wallas-assets.part04 ]; then
+            echo "::error::The four WALLA asset archive parts are missing."
+            echo "::error::Upload Wallas-assets.part01 through Wallas-assets.part04 to the repository root, then run this workflow again."
             exit 1
           fi
 
-          if [ ! -f "app/src/main/AndroidManifest.xml" ]; then
-            echo "::error::app/src/main/AndroidManifest.xml is missing."
-            echo "::error::The WALLA Android source/assets must be present in the repository or in Wallas-Fluffy-Stuffys-Android-project.zip before an APK can be built."
-            exit 1
-          fi
+          bash tools/assemble-icon-assets.sh
+          rm -rf _assets
+          mkdir -p _assets
+          unzip -q Wallas-Fluffy-Stuffys-v1.0.0-ICON-ASSETS.zip -d _assets
+
+          asset_root="$PWD/_assets/Wallas-Fluffy-Stuffys-v1.0.0-ICON-ASSETS/Wallas-Fluffy-Stuffys-Icon-Assets-v1.0.0"
+          test -d "$asset_root/icons"
+          test -d "$asset_root/xml"
+
+          mkdir -p app/src/main/res/drawable-nodpi app/src/main/res/xml icon-assets/audit icon-assets/docs
+          cp "$asset_root"/icons/*.webp app/src/main/res/drawable-nodpi/
+          cp "$asset_root"/xml/*.xml app/src/main/res/xml/
+          cp "$asset_root"/audit/* icon-assets/audit/
+          cp "$asset_root"/README.md "$asset_root"/COMPATIBILITY.md "$asset_root"/ATTRIBUTION-AND-TRADEMARK-NOTICES.md icon-assets/docs/
+
+          echo "Installed $(find app/src/main/res/drawable-nodpi -type f -name '*.webp' | wc -l) WebP icons."
+
+      - name: Verify Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f settings.gradle
+          test -f app/src/main/AndroidManifest.xml
+          test -f app/src/main/res/xml/appfilter.xml
+          test -f app/src/main/res/xml/icon_pack.xml
 
       - name: Set up Java
         uses: actions/setup-java@v4
