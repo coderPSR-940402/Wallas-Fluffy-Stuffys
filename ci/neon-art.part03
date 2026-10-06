@@ -1,0 +1,28 @@
+    elif symbol=='photo': rr((130,150,382,362),34); d.polygon([(160,320),(225,250),(280,300),(325,235),(352,320)],fill=0); d.ellipse((170,186,220,236),fill=0)
+    elif symbol=='calendar': rr((130,136,382,390),46); d.rectangle((130,175,382,235),fill=0); d.rectangle((180,100,210,165),fill=255); d.rectangle((302,100,332,165),fill=255); text_symbol('31',img,size=120,offset=(0,54))
+    elif symbol=='grid': [d.rounded_rectangle((165+j*110,165+i*110,245+j*110,245+i*110),radius=24,fill=255) for i in range(2) for j in range(2)]
+    elif symbol=='keyboard': rr((110,175,402,345),36); [d.rectangle((145+i*60,210+j*38,181+i*60,230+j*38),fill=0) for i in range(4) for j in range(3)]
+    elif symbol=='widgets': d.rounded_rectangle((146,146,366,366),radius=40,outline=255,width=32); d.line((256,146,256,366),fill=255,width=22); d.line((146,256,366,256),fill=255,width=22)
+    elif symbol=='brush': d.rectangle((125,340,304,384),fill=255); d.polygon([(304,340),(386,250),(415,280),(335,384)],fill=255); d.polygon([(125,340),(92,350),(125,384)],fill=255)
+    elif symbol=='wand': d.line((150,350,340,160),fill=255,width=36); d.polygon([(340,95),(357,145),(410,145),(367,177),(382,228),(340,195),(298,228),(313,177),(270,145),(323,145)],fill=255)
+    elif symbol=='flow': d.line((150,150,150,362,362,362),fill=255,width=42); d.line((362,150,362,362),fill=255,width=42); [d.ellipse((p[0]-34,p[1]-34,p[0]+34,p[1]+34),fill=255) for p in [(150,150),(150,362),(362,362),(362,150)]]
+    elif symbol=='display': rr((120,140,392,320),38); d.rectangle((230,320,282,370),fill=255); rr((180,370,332,398),16)
+    elif symbol=='shield': d.polygon([(256,100),(372,150),(345,302),(256,410),(167,302),(140,150)],fill=255); d.line((256,174,256,332),fill=0,width=22); d.line((190,252,322,252),fill=0,width=22)
+    elif symbol=='store': rr((136,176,376,380),38); d.polygon([(120,176),(392,176),(356,124),(156,124)],fill=255); d.line((186,254,326,254),fill=0,width=18); d.line((186,300,326,300),fill=0,width=18)
+    elif symbol=='people': d.ellipse((150,120,260,230),fill=255); d.ellipse((252,120,362,230),fill=255); d.rounded_rectangle((115,235,285,390),radius=70,fill=255); d.rounded_rectangle((227,235,397,390),radius=70,fill=255)
+    elif symbol=='send': d.polygon([(110,255),(402,136),(322,256),(402,377)],fill=255); d.line((322,256,190,256),fill=0,width=18)
+    elif symbol=='claude': text_symbol('C',img,size=270)
+    elif symbol=='gemini': d.polygon([(256,90),(294,218),(422,256),(294,294),(256,422),(218,294),(90,256),(218,218)],fill=255)
+    elif symbol=='copilot': d.rounded_rectangle((145,156,270,355),radius=60,fill=255); d.rounded_rectangle((242,156,367,355),radius=60,fill=255); d.ellipse((178,210,236,268),fill=0); d.ellipse((276,244,334,302),fill=0)
+    elif symbol=='bank': d.polygon([(256,110),(392,180),(120,180)],fill=255); [d.rectangle((x,185,x+28,342),fill=255) for x in [170,232,294,356]]; d.rectangle((120,347,392,385),fill=255)
+    elif symbol=='equalizer': [d.rounded_rectangle((x,420-h,x+34,388),radius=12,fill=255) for x,h in [(170,110),(236,180),(302,140),(368,215)]]
+    elif symbol=='bulb': d.ellipse((170,110,342,282),fill=255); d.rectangle((220,265,292,342),fill=255); d.rectangle((208,342,304,378),fill=255)
+    elif symbol=='json': text_symbol('{ }',img,size=155)
+    elif symbol=='sheet': rr((155,110,355,402),36); d.rectangle((240,110,355,190),fill=0); [d.line((188,y,322,y),fill=0,width=18) for y in [238,282,326]]; [d.line((x,205,x,350),fill=0,width=16) for x in [222,272]]
+    elif symbol=='palette': d.ellipse((126,126,386,386),fill=255); [d.ellipse((p[0]-20,p[1]-20,p[0]+20,p[1]+20),fill=0) for p in [(190,195),(250,170),(300,220),(215,270)]]; d.pieslice((236,248,372,384),start=35,end=180,fill=0)
+    elif symbol=='spark_cube': d.polygon([(256,102),(366,170),(256,238),(146,170)],fill=255); d.polygon([(146,170),(256,238),(256,364),(146,296)],fill=255); d.polygon([(366,170),(256,238),(256,364),(366,296)],fill=255); d.line((384,108,420,108),fill=255,width=10); d.line((402,90,402,126),fill=255,width=10)
+    elif symbol=='mic': d.rounded_rectangle((196,108,316,286),radius=55,fill=255); d.rectangle((236,286,276,352),fill=255); d.arc((166,164,346,338),start=0,end=180,fill=255,width=24); d.rectangle((206,352,306,384),fill=255)
+    elif symbol=='blueprint': rr((128,128,384,384),28); d.rectangle((155,155,357,357),outline=0,width=10); d.line((180,180,330,180,330,330),fill=0,width=12); d.line((250,155,250,357),fill=0,width=10); d.line((155,250,357,250),fill=0,width=10)
+    elif symbol=='moon': d.ellipse((150,110,350,310),fill=255); d.ellipse((220,95,370,265),fill=0); d.ellipse((148,326,364,366),fill=255)
+    elif symbol=='star': d.polygon([(256,108),(288,214),(396,214),(308,278),(340,384),(256,318),(172,384),(204,278),(116,214),(224,214)],fill=255)
+    elif symbol=='scissors': d.line((190,310,326,178),fill=255,width=28); d.line((190,178,326,310),fill=255,width=28); d.ellipse((132,282,214,364),outline=255,width=24); d.ellipse((132,124,214,206),outline=255,width=24)

@@ -1,0 +1,4 @@
+    soft=mask.filter(ImageFilter.GaussianBlur(8)); cyan_glow=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0)); cyan_glow.paste((*CYAN,90),(0,0),ImageChops.offset(soft,8,5)); pink_glow=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0)); pink_glow.paste((*MAGENTA,108),(0,0),ImageChops.offset(soft,-5,-5)); out=Image.alpha_composite(out,cyan_glow); out=Image.alpha_composite(out,pink_glow); out=Image.alpha_composite(out,front)
+    outline1=ImageChops.subtract(mask.filter(ImageFilter.MaxFilter(7)),mask); layer1=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0)); layer1.paste((*MAGENTA,240),(0,0),outline1); out=Image.alpha_composite(out,layer1)
+    outline2=ImageChops.subtract(ImageChops.offset(mask.filter(ImageFilter.MaxFilter(9)),2,2),ImageChops.offset(mask,2,2)); layer2=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0)); layer2.paste((*CYAN,160),(0,0),outline2); out=Image.alpha_composite(out,layer2)
+    return out

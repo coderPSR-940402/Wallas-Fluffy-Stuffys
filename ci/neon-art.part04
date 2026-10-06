@@ -1,0 +1,38 @@
+    elif symbol=='cloud': d.ellipse((150,220,350,360),fill=255); d.ellipse((184,150,292,258),fill=255); d.ellipse((246,170,372,296),fill=255)
+    elif symbol=='note_pin': rr((150,120,362,390),40); d.polygon([(236,120),(288,120),(280,182),(244,182)],fill=0); d.line((190,250,320,250),fill=0,width=18); d.line((190,300,286,300),fill=0,width=18)
+    elif symbol=='phone': d.arc((126,138,326,338),start=130,end=220,fill=255,width=56); d.arc((186,198,386,398),start=310,end=40,fill=255,width=56)
+    elif symbol=='bell': d.arc((162,128,350,332),start=180,end=360,fill=255,width=42); d.rectangle((180,220,332,338),fill=255); d.ellipse((234,350,278,394),fill=255); d.rectangle((206,338,306,352),fill=255)
+    elif symbol=='spark': d.polygon([(256,96),(282,202),(388,228),(282,254),(256,360),(230,254),(124,228),(230,202)],fill=255)
+    elif symbol=='watch': d.rounded_rectangle((178,76,334,436),radius=48,fill=255); d.rectangle((210,144,302,328),fill=0); d.rounded_rectangle((192,128,320,344),radius=24,outline=0,width=16)
+    elif symbol=='globe': d.ellipse((128,128,384,384),outline=255,width=36); d.arc((160,128,352,384),start=90,end=270,fill=255,width=16); d.arc((160,128,352,384),start=270,end=90,fill=255,width=16); d.arc((128,180,384,332),start=0,end=180,fill=255,width=16); d.arc((128,180,384,332),start=180,end=360,fill=255,width=16)
+    elif symbol=='clone': rr((130,170,300,340),34); rr((212,130,382,300),34)
+    elif symbol=='lifebuoy': d.ellipse((120,120,392,392),fill=255); d.ellipse((200,200,312,312),fill=0); d.rectangle((236,120,276,392),fill=0); d.rectangle((120,236,392,276),fill=0)
+    elif symbol=='smile': d.ellipse((136,136,376,376),fill=255); d.ellipse((200,210,224,234),fill=0); d.ellipse((288,210,312,234),fill=0); d.arc((196,206,316,316),start=20,end=160,fill=0,width=18)
+    elif symbol=='clapper': rr((144,170,368,362),24); d.polygon([(144,148),(368,148),(328,202),(104,202)],fill=255); [d.line((x,148,x-40,202),fill=0,width=12) for x in [144,208,272,336]]
+    elif symbol=='video': d.rounded_rectangle((128,172,332,340),radius=32,fill=255); d.polygon([(332,214),(404,176),(404,336),(332,298)],fill=255)
+    elif symbol=='magnify': d.ellipse((138,138,318,318),outline=255,width=36); d.line((292,292,388,388),fill=255,width=32)
+    else: text_symbol(symbol[:2].upper(),img,size=190)
+    return img
+
+def lerp(c1,c2,t): return tuple(int(c1[i]*(1-t)+c2[i]*t) for i in range(3))
+def generate_icon(symbol):
+    mask=icon_mask(symbol); out=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0)); bbox=mask.getbbox() or (120,120,392,392)
+    extrude=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0))
+    for i in range(18,0,-1):
+        dx,dy=int(i*1.65),int(i*1.4); col=lerp(PINK,PURPLE,i/18); alpha=int(28+(18-i)*8); layer=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0)); shifted=ImageChops.offset(mask,dx,dy); layer.paste((*col,alpha),(0,0),shifted); extrude=Image.alpha_composite(extrude,layer)
+    out=Image.alpha_composite(out,extrude)
+    halo=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0)); hd=ImageDraw.Draw(halo); cx,cy=CENTER,CENTER; radius=max(bbox[2]-bbox[0],bbox[3]-bbox[1])//2+28
+    for ang in [random.uniform(0,2*math.pi) for _ in range(16)]:
+        x1=int(cx+math.cos(ang)*radius); y1=int(cy+math.sin(ang)*radius); x2=int(cx+math.cos(ang)*(radius+random.randint(26,52))); y2=int(cy+math.sin(ang)*(radius+random.randint(26,52))); x3=x2+random.randint(-16,16); y3=y2+random.randint(-16,16); col=random.choice([PINK,PURPLE,CYAN,(255,250,255)]); hd.line((x1,y1,x2,y2,x3,y3),fill=(*col,215),width=random.randint(4,8)); rr=random.randint(5,12); hd.ellipse((x3-rr,y3-rr,x3+rr,y3+rr),fill=(*col,230))
+    halo=halo.filter(ImageFilter.GaussianBlur(3)); out=Image.alpha_composite(out,halo)
+    front=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0)); front.paste((*WHITE,255),(0,0),mask)
+    fuzz=Image.new('RGBA',(SIZE,SIZE),(0,0,0,0)); fd=ImageDraw.Draw(fuzz)
+    for _ in range(3800):
+        x=random.randint(max(0,bbox[0]-6),min(SIZE-1,bbox[2]+6)); y=random.randint(max(0,bbox[1]-6),min(SIZE-1,bbox[3]+6));
+        if mask.getpixel((x,y))<10: continue
+        length=random.randint(4,9); angle=random.random()*2*math.pi; x2=x+math.cos(angle)*length; y2=y+math.sin(angle)*length; col=random.choice([(255,255,255,30),(249,243,255,30),(238,230,247,22),(252,248,255,36)]); fd.line((x,y,x2,y2),fill=col,width=1)
+    for _ in range(160):
+        x=random.randint(bbox[0],bbox[2]); y=random.randint(bbox[1],bbox[3]);
+        if mask.getpixel((x,y))<10: continue
+        rr=random.randint(2,6); col=random.choice([PINK,PURPLE,CYAN]); fd.ellipse((x-rr,y-rr,x+rr,y+rr),fill=(*col,random.randint(120,200)))
+    front=Image.alpha_composite(front,fuzz)
