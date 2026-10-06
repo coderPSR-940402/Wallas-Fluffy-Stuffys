@@ -1,4 +1,84 @@
+import java.security.MessageDigest
+
 plugins { id 'com.android.application' }
+
+def assetParts = (1..4).collect { index ->
+    rootProject.file(String.format('Wallas-assets.part%02d', index))
+}
+def expectedAssetArchiveSha256 = '2c00f3c617ab27633f79f8b68d42e3acda614f7621387a2f7da7bc93385a2b9d'
+def generatedResPath = "$buildDir/generated/walla/res"
+
+def prepareWallaAssets = tasks.register('prepareWallaAssets') {
+    inputs.files(assetParts)
+    outputs.dir(generatedResPath)
+
+    doLast {
+        def missingParts = assetParts.findAll { !it.isFile() }
+        if (!missingParts.isEmpty()) {
+            throw new GradleException("Missing WALLA asset archive parts: ${missingParts*.name.join(', ')}")
+        }
+
+        def workDir = file("$buildDir/intermediates/walla-assets")
+        workDir.mkdirs()
+        def archiveFile = new File(workDir, 'Wallas-Fluffy-Stuffys-v1.0.0-ICON-ASSETS.zip')
+
+        archiveFile.withOutputStream { output ->
+            assetParts.each { part ->
+                part.withInputStream { input ->
+                    byte[] buffer = new byte[8192]
+                    int read
+                    while ((read = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, read)
+                    }
+                }
+            }
+        }
+
+        def digest = MessageDigest.getInstance('SHA-256')
+        archiveFile.withInputStream { input ->
+            byte[] buffer = new byte[8192]
+            int read
+            while ((read = input.read(buffer)) != -1) {
+                digest.update(buffer, 0, read)
+            }
+        }
+        def actualSha256 = digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+        if (actualSha256 != expectedAssetArchiveSha256) {
+            throw new GradleException("WALLA asset archive checksum mismatch: ${actualSha256}")
+        }
+
+        def outputDir = file(generatedResPath)
+        delete outputDir
+        new File(outputDir, 'drawable-nodpi').mkdirs()
+        new File(outputDir, 'xml').mkdirs()
+
+        def archiveRoot = 'Wallas-Fluffy-Stuffys-v1.0.0-ICON-ASSETS/Wallas-Fluffy-Stuffys-Icon-Assets-v1.0.0'
+        copy {
+            from zipTree(archiveFile)
+            include "${archiveRoot}/icons/*.webp"
+            eachFile { details -> details.path = "drawable-nodpi/${details.name}" }
+            includeEmptyDirs = false
+            into outputDir
+        }
+        copy {
+            from zipTree(archiveFile)
+            include "${archiveRoot}/xml/*.xml"
+            eachFile { details -> details.path = "xml/${details.name}" }
+            includeEmptyDirs = false
+            into outputDir
+        }
+
+        def iconCount = fileTree(new File(outputDir, 'drawable-nodpi')) { include '*.webp' }.files.size()
+        if (iconCount != 349) {
+            throw new GradleException("Expected 349 WALLA icons, restored ${iconCount}")
+        }
+        ['appfilter.xml', 'icon_pack.xml'].each { requiredXml ->
+            if (!new File(outputDir, "xml/${requiredXml}").isFile()) {
+                throw new GradleException("Required icon-pack resource missing: ${requiredXml}")
+            }
+        }
+    }
+}
 
 android {
     namespace 'com.wallathemes.fluffystuffys'
@@ -12,29 +92,48 @@ android {
         versionName '1.0.0'
     }
 
-    // CI supplies the keystore path and credentials through environment variables.
-    // Local builds remain possible without a release keystore.
-    def ciKeystorePath = System.getenv('WALLA_KEYSTORE_PATH')
-    def ciKeystorePassword = System.getenv('WALLA_KEYSTORE_PASSWORD')
-    def ciKeyAlias = System.getenv('WALLA_KEY_ALIAS')
-    def ciKeyPassword = System.getenv('WALLA_KEY_PASSWORD')
+    sourceSets {
+        main {
+            res.srcDir generatedResPath
+        }
+    }
+
+    def signingValues = [
+        path: System.getenv('WALLA_KEYSTORE_PATH'),
+        storePassword: System.getenv('WALLA_KEYSTORE_PASSWORD'),
+        alias: System.getenv('WALLA_KEY_ALIAS'),
+        keyPassword: System.getenv('WALLA_KEY_PASSWORD')
+    ]
+    def configuredSigningValues = signingValues.findAll { key, value -> value != null && !value.trim().isEmpty() }
+    if (!configuredSigningValues.isEmpty() && configuredSigningValues.size() != signingValues.size()) {
+        def missing = signingValues.findAll { key, value -> value == null || value.trim().isEmpty() }.keySet().join(', ')
+        throw new GradleException("Incomplete WALLA release signing configuration; missing: ${missing}")
+    }
+    def releaseSigningConfigured = configuredSigningValues.size() == signingValues.size()
+    if (releaseSigningConfigured && !file(signingValues.path).isFile()) {
+        throw new GradleException("WALLA release keystore does not exist: ${signingValues.path}")
+    }
 
     signingConfigs {
         release {
-            if (ciKeystorePath && file(ciKeystorePath).exists()) {
-                storeFile file(ciKeystorePath)
-                storePassword ciKeystorePassword
-                keyAlias ciKeyAlias
-                keyPassword ciKeyPassword
+            if (releaseSigningConfigured) {
+                storeFile file(signingValues.path)
+                storePassword signingValues.storePassword
+                keyAlias signingValues.alias
+                keyPassword signingValues.keyPassword
             }
         }
     }
 
     buildTypes {
         release {
-            if (ciKeystorePath && file(ciKeystorePath).exists()) {
+            if (releaseSigningConfigured) {
                 signingConfig signingConfigs.release
             }
         }
     }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn prepareWallaAssets
 }

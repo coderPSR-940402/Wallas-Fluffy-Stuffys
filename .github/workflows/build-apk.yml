@@ -1,9 +1,11 @@
 name: Build WALLA APK
-# Release verification uses explicit Android SDK build-tools paths.
 
 on:
   workflow_dispatch:
   push:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -13,42 +15,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Restore WALLA icon assets
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ ! -f Wallas-assets.part01 ] || [ ! -f Wallas-assets.part02 ] || [ ! -f Wallas-assets.part03 ] || [ ! -f Wallas-assets.part04 ]; then
-            echo "::error::The four WALLA asset archive parts are missing."
-            echo "::error::Upload Wallas-assets.part01 through Wallas-assets.part04 to the repository root, then run this workflow again."
-            exit 1
-          fi
-
-          bash tools/assemble-icon-assets.sh
-          rm -rf _assets
-          mkdir -p _assets
-          unzip -q Wallas-Fluffy-Stuffys-v1.0.0-ICON-ASSETS.zip -d _assets
-
-          asset_root="$PWD/_assets/Wallas-Fluffy-Stuffys-v1.0.0-ICON-ASSETS/Wallas-Fluffy-Stuffys-Icon-Assets-v1.0.0"
-          test -d "$asset_root/icons"
-          test -d "$asset_root/xml"
-
-          mkdir -p app/src/main/res/drawable-nodpi app/src/main/res/xml icon-assets/audit icon-assets/docs
-          cp "$asset_root"/icons/*.webp app/src/main/res/drawable-nodpi/
-          cp "$asset_root"/xml/*.xml app/src/main/res/xml/
-          cp "$asset_root"/audit/* icon-assets/audit/
-          cp "$asset_root"/README.md "$asset_root"/COMPATIBILITY.md "$asset_root"/ATTRIBUTION-AND-TRADEMARK-NOTICES.md icon-assets/docs/
-
-          echo "Installed $(find app/src/main/res/drawable-nodpi -type f -name '*.webp' | wc -l) WebP icons."
-
-      - name: Verify Android project
+      - name: Verify repository inputs
         shell: bash
         run: |
           set -euo pipefail
           test -f settings.gradle
           test -f app/src/main/AndroidManifest.xml
-          test -f app/src/main/res/xml/appfilter.xml
-          test -f app/src/main/res/xml/icon_pack.xml
+          test -x gradlew
+          test -f gradle/wrapper/gradle-wrapper.properties
+          for part in Wallas-assets.part01 Wallas-assets.part02 Wallas-assets.part03 Wallas-assets.part04; do
+            test -s "$part"
+          done
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -61,60 +38,137 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
-      - name: Set up Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
 
-      - name: Create CI release keystore
+      - name: Bootstrap verified Gradle wrapper
         shell: bash
+        run: ./gradlew --version
+
+      - name: Configure persistent release signing
+        id: signing
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.WALLA_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.WALLA_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.WALLA_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.WALLA_RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+
+          values=("$KEYSTORE_BASE64" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD")
+          configured=0
+          for value in "${values[@]}"; do
+            if [[ -n "$value" ]]; then
+              configured=$((configured + 1))
+            fi
+          done
+
+          if [[ "$configured" -eq 0 ]]; then
+            echo "::notice::Persistent WALLA signing secrets are not configured. CI will verify an unsigned release APK only."
+            echo "WALLA_SIGNED_RELEASE=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [[ "$configured" -ne 4 ]]; then
+            echo "::error::Release signing is partially configured. Set all four WALLA_RELEASE_* GitHub Actions secrets."
+            exit 1
+          fi
+
           KEYSTORE="$RUNNER_TEMP/walla-release.jks"
-          PASSWORD="$(python3 - <<'PY'
-          import secrets
-          print(secrets.token_urlsafe(32))
-          PY
-          )"
-          keytool -genkeypair -v             -keystore "$KEYSTORE"             -storepass "$PASSWORD"             -keypass "$PASSWORD"             -alias walla-release             -keyalg RSA             -keysize 2048             -validity 10000             -dname "CN=Walla's Fluffy Stuffy's, OU=Release, O=Walla's Fluffy Stuffy's, L=Unknown, ST=Unknown, C=ZA"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+          keytool -list -keystore "$KEYSTORE" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+
           {
             echo "WALLA_KEYSTORE_PATH=$KEYSTORE"
-            echo "WALLA_KEYSTORE_PASSWORD=$PASSWORD"
-            echo "WALLA_KEY_ALIAS=walla-release"
-            echo "WALLA_KEY_PASSWORD=$PASSWORD"
+            echo "WALLA_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "WALLA_KEY_ALIAS=$KEY_ALIAS"
+            echo "WALLA_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "WALLA_SIGNED_RELEASE=true"
           } >> "$GITHUB_ENV"
 
-      - name: Validate Android resource XML
+      - name: Validate Android values XML
         shell: bash
         run: |
           set -euo pipefail
           grep -RIn '\\u[0-9A-Fa-f]*[^0-9A-Fa-f]' app/src/main/res/values && { echo '::error::Invalid Unicode escape found in Android values resources.'; exit 1; } || true
           python3 - <<'PY'
-          import pathlib, xml.etree.ElementTree as ET
-          for p in pathlib.Path('app/src/main/res/values').glob('*.xml'):
-              ET.parse(p)
+          import pathlib
+          import xml.etree.ElementTree as ET
+
+          for path in pathlib.Path('app/src/main/res/values').glob('*.xml'):
+              ET.parse(path)
           print('Android values XML is well-formed.')
           PY
 
-      - name: Build signed release APK
-        run: gradle --no-daemon :app:clean :app:assembleRelease
-
-      - name: Verify APK signature and alignment
+      - name: Build release APK
         shell: bash
         run: |
           set -euo pipefail
-          APK="app/build/outputs/apk/release/app-release.apk"
+          ./gradlew --no-daemon :app:clean
+          ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Validate restored icon resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          RES_DIR="app/build/generated/walla/res"
+          count="$(find "$RES_DIR/drawable-nodpi" -maxdepth 1 -type f -name '*.webp' | wc -l)"
+          test "$count" -eq 349
+          test -s "$RES_DIR/xml/appfilter.xml"
+          test -s "$RES_DIR/xml/icon_pack.xml"
+          echo "Validated $count generated WALLA icons."
+
+      - name: Resolve APK artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${WALLA_SIGNED_RELEASE:-false}" == "true" ]]; then
+            APK="app/build/outputs/apk/release/app-release.apk"
+            ARTIFACT_NAME="Wallas-Fluffy-Stuffys-install-ready"
+          else
+            APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+            ARTIFACT_NAME="Wallas-Fluffy-Stuffys-unsigned-validation"
+          fi
           test -s "$APK"
+          {
+            echo "WALLA_APK_PATH=$APK"
+            echo "WALLA_ARTIFACT_NAME=$ARTIFACT_NAME"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify APK package, alignment and signature
+        shell: bash
+        run: |
+          set -euo pipefail
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           test -x "$APKSIGNER"
           test -x "$ZIPALIGN"
-          "$APKSIGNER" verify --verbose --print-certs "$APK"
-          "$ZIPALIGN" -c -P 16 -v 4 "$APK"
+          test -x "$AAPT"
+          "$AAPT" dump badging "$WALLA_APK_PATH" | grep -F "package: name='com.wallathemes.fluffystuffys' versionCode='10000' versionName='1.0.0'"
+          "$ZIPALIGN" -c -P 16 -v 4 "$WALLA_APK_PATH"
+          if [[ "${WALLA_SIGNED_RELEASE:-false}" == "true" ]]; then
+            "$APKSIGNER" verify --verbose --print-certs "$WALLA_APK_PATH"
+          else
+            if "$APKSIGNER" verify "$WALLA_APK_PATH" >/dev/null 2>&1; then
+              echo "::error::Unsigned validation APK unexpectedly contains a valid signature."
+              exit 1
+            fi
+          fi
 
-      - name: Upload install-ready APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Wallas-Fluffy-Stuffys-install-ready
-          path: app/build/outputs/apk/release/app-release.apk
+          name: ${{ env.WALLA_ARTIFACT_NAME }}
+          path: ${{ env.WALLA_APK_PATH }}
           if-no-files-found: error
+
+      - name: Remove signing material
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${WALLA_KEYSTORE_PATH:-}" ]]; then
+            rm -f "$WALLA_KEYSTORE_PATH"
+          fi
