@@ -62,7 +62,7 @@ jobs:
           APK="neon_icon_pack/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.neonplush.iconpack'"
-          "$ANDROID_HOME/build-tools/34.0.0/zipalign" -c -P 16 -v 4 "$APK"
+          "$ANDROID_HOME/build-tools/34.0.0/zipalign" -c -p -v 4 "$APK"
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose "$APK"
           cp "$APK" Neon-Plush-Circuit-v1.0-debug.apk
           sha256sum Neon-Plush-Circuit-v1.0-debug.apk
